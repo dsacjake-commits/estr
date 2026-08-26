@@ -17,7 +17,7 @@ jobs:
       - name: ⚙️ Instalando herramientas de disección multimedia por hardware
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core curl jq zip
+          sudo apt-get install -y ffmpeg fonts-dejavu-core curl jq
 
       - name: 🚀 Clonación Satelital en Cadena Ultra-HD y Purga de Almacenamiento
         run: |
@@ -61,25 +61,30 @@ jobs:
               LIMITE_GITHUB=2147483648 # 2GB exactos en bytes
               
               if [ "$PESO_BYTES" -gt "$LIMITE_GITHUB" ]; then
-                echo "🚨 [ALERTA DE PESO] El archivo supera los 2GB ($PESO_BYTES bytes). Activando protocolo HLS biónico..."
+                echo "🚨 [ALERTA DE PESO] El archivo supera los 2GB ($PESO_BYTES bytes). Activando protocolo HLS sin compresión..."
                 
-                # Creamos una carpeta limpia para meter los segmentos del fideo troceado
-                CARPETA_HLS="hls_${NOMBRE_FINAL%.*}"
-                mkdir -p "$CARPETA_HLS"
+                # Definimos prefijos limpios basados en el nombre original para evitar colisiones
+                PREFIJO_HLS="${NOMBRE_FINAL%.*}"
                 
-                echo "✂️ Fragmentando película en segmentos HLS de 10 segundos..."
+                echo "✂️ Fragmentando película en segmentos HLS limpios..."
+                # Creamos el m3u8 modificando el nombre de los .ts para que incluyan el nombre de la peli
                 ffmpeg -y -nostdin -i "$NOMBRE_FINAL" -c:v copy -c:a copy \
-                  -hls_time 10 -hls_list_size 0 -f hls "$CARPETA_HLS/playlist.m3u8"
+                  -hls_time 10 -hls_list_size 0 -hls_segment_filename "${PREFIJO_HLS}_%03d.ts" -f hls "${PREFIJO_HLS}.m3u8"
                 
-                echo "📦 Empaquetando ecosistema HLS en contenedor ZIP para bypass de GitHub..."
-                NOMBRE_ZIP="${NOMBRE_FINAL%.*}.zip"
-                zip -r "$NOMBRE_ZIP" "$CARPETA_HLS"
+                echo "💾 FASE 2: Inyectando ráfaga de fragmentos HLS individuales a las Releases..."
                 
-                echo "💾 FASE 2: Inyectando el paquete ZIP HLS en las Releases bunker_mutiny..."
-                gh release upload bunker_mutiny "$NOMBRE_ZIP" --clobber || echo "⚠️ Falló el pasamano del ZIP a las Releases."
+                # Subimos primero el archivo índice maestro
+                gh release upload bunker_mutiny "${PREFIJO_HLS}.m3u8" --clobber || echo "⚠️ Falló la playlist maestro."
+                rm -f "${PREFIJO_HLS}.m3u8"
                 
-                # Limpieza de las carpetas temporales HLS creadas
-                rm -rf "$CARPETA_HLS" "$NOMBRE_ZIP"
+                # Subimos secuencialmente cada fragmento de video .ts generado y lo purgamos inmediatamente de la RAM virtual
+                for segmento in ${PREFIJO_HLS}_*.ts; do
+                  if [ -f "$segmento" ]; then
+                    gh release upload bunker_mutiny "$segmento" --clobber || echo "⚠️ Falló subir fragmento: $segmento"
+                    rm -f "$segmento" # Purgado biónico inmediato por archivo
+                  fi
+                done
+                
               else
                 echo "✅ Película ligera de bajo peso. Peso total real en disco:"
                 du -sh "$NOMBRE_FINAL"
@@ -99,3 +104,5 @@ jobs:
           echo "🏁 [MUTINY TV] Toda la cartelera del Gist fue clonada y resguardada deBoxes."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        
