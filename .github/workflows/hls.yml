@@ -1,0 +1,101 @@
+name: 📡 hls
+
+on:
+  workflow_dispatch: # Se prende con un único botón de PLAY manual en la web de GitHub
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  descarga_bunker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🗄️ Inicializando espacio en el disco virtual de Microsoft
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Instalando herramientas de disección multimedia por hardware
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core curl jq zip
+
+      - name: 🚀 Clonación Satelital en Cadena Ultra-HD y Purga de Almacenamiento
+        run: |
+          # 🪓 [REACTOR CENTRAL INDUSTRIAL v6.5 - DIEGO BULK COPY & PURGE CORE]
+          export TERM=xterm
+          
+          echo "📡 [MUTINY TV] SUCCIONANDO ÓRDENES DE TRABAJO DESDE EL GIST..."
+          
+          # 1. Chupamos tu playlist unificada de descargas desde tu Gist privado
+          curl -s "https://gist.githubusercontent.com/jav45dev-ctrl/36a0241efb9e52e647e15a969eaa8459/raw/prueba_uni.txt" | tr -d '\r' | sed '/^$/d' > ordenes_bunker.txt
+          
+          contador=1
+          
+          # 2. EL REMACHE DE AJEDREZ SOBERANO: Usamos el descriptor de archivos 3 (<&3)
+          while read -r linea <&3 || [ -n "$linea" ]; do
+            URL_PIRATA=$(echo "$linea" | awk -F'|' '{print $1}' | tr -d ' ')
+            NOMBRE_FINAL=$(echo "$linea" | awk -F'|' '{print $2}' | tr -d ' ')
+            
+            if [ -n "$URL_PIRATA" ] && [ -n "$NOMBRE_FINAL" ]; then
+              echo "------------------------------------------------------------"
+              echo "🍿 [PROCESANDO TRABAJO N° $contador]: $NOMBRE_FINAL"
+              echo "🔗 Link Origen: $URL_PIRATA"
+              echo "------------------------------------------------------------"
+              
+              echo "📥 FASE 1: Descargando fideo digital útil con tu motor intacto deBoxes..."
+              ffmpeg -y -nostdin -headers "User-Agent: VLC/3.0.18 LibVLC/3.0.18" \
+                -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 \
+                -i "$URL_PIRATA" -c:v copy -c:a aac -ac 2 -ar 44100 -async 1 \
+                -bsf:a aac_adtstoasc "$NOMBRE_FINAL" || true
+
+              # 🛠️ BYPASS DE ERRORES BIÓNICO
+              if [ ! -s "$NOMBRE_FINAL" ]; then
+                echo "⚠️ [ALERTA DE BOXES] El fideo del Renglón $contador falló o caducó. Saltando..."
+                rm -f "$NOMBRE_FINAL"
+                contador=$((contador + 1))
+                continue
+              fi
+              
+              # ⚖️ DETECTOR DE TONELAJE (LÍMITE 2GB)
+              PESO_BYTES=$(stat -c%s "$NOMBRE_FINAL")
+              LIMITE_GITHUB=2147483648 # 2GB exactos en bytes
+              
+              if [ "$PESO_BYTES" -gt "$LIMITE_GITHUB" ]; then
+                echo "🚨 [ALERTA DE PESO] El archivo supera los 2GB ($PESO_BYTES bytes). Activando protocolo HLS biónico..."
+                
+                # Creamos una carpeta limpia para meter los segmentos del fideo troceado
+                CARPETA_HLS="hls_${NOMBRE_FINAL%.*}"
+                mkdir -p "$CARPETA_HLS"
+                
+                echo "✂️ Fragmentando película en segmentos HLS de 10 segundos..."
+                ffmpeg -y -nostdin -i "$NOMBRE_FINAL" -c:v copy -c:a copy \
+                  -hls_time 10 -hls_list_size 0 -f hls "$CARPETA_HLS/playlist.m3u8"
+                
+                echo "📦 Empaquetando ecosistema HLS en contenedor ZIP para bypass de GitHub..."
+                NOMBRE_ZIP="${NOMBRE_FINAL%.*}.zip"
+                zip -r "$NOMBRE_ZIP" "$CARPETA_HLS"
+                
+                echo "💾 FASE 2: Inyectando el paquete ZIP HLS en las Releases bunker_mutiny..."
+                gh release upload bunker_mutiny "$NOMBRE_ZIP" --clobber || echo "⚠️ Falló el pasamano del ZIP a las Releases."
+                
+                # Limpieza de las carpetas temporales HLS creadas
+                rm -rf "$CARPETA_HLS" "$NOMBRE_ZIP"
+              else
+                echo "✅ Película ligera de bajo peso. Peso total real en disco:"
+                du -sh "$NOMBRE_FINAL"
+                
+                echo "💾 FASE 2: Inyectando el video intacto estándar en las Releases bunker_mutiny..."
+                gh release upload bunker_mutiny "$NOMBRE_FINAL" --clobber || echo "⚠️ Falló el pasamano a las Releases."
+              fi
+              
+              echo "🪓 FASE 3: EL SEGURO DE TITANIO - PURGA TOTAL DEL DISCO VIRTUAL..."
+              rm -f "$NOMBRE_FINAL"
+              
+              echo "✅ TRABAJO N° $contador COMPLETADO CON ÉXITO ABSOLUTO."
+              contador=$((contador + 1))
+            fi
+          done 3< ordenes_bunker.txt
+          
+          echo "🏁 [MUTINY TV] Toda la cartelera del Gist fue clonada y resguardada deBoxes."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
