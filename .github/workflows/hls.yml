@@ -21,7 +21,7 @@ jobs:
 
       - name: 🚀 Clonación Satelital en Cadena Ultra-HD y Purga de Almacenamiento
         run: |
-          # 🪓 [REACTOR CENTRAL INDUSTRIAL v6.5 - DIEGO BULK COPY & PURGE CORE]
+          # 🪓 [REACTOR CENTRAL INDUSTRIAL v6.7 - DIEGO HIGH-EFFICIENCY CINE CORE]
           export TERM=xterm
           
           echo "📡 [MUTINY TV] SUCCIONANDO ÓRDENES DE TRABAJO DESDE EL GIST..."
@@ -62,12 +62,14 @@ jobs:
               
               if [ "$PESO_BYTES" -gt "$LIMITE_GITHUB" ]; then
                 echo "🚨 [ALERTA DE PESO] El archivo supera los 2GB ($PESO_BYTES bytes)."
-                echo "🗜️ Activando compresor inteligente H.265 (HEVC) para cine retro..."
+                echo "🗜️ Activando compresor lento H.265 (HEVC) de Alta Fidelidad..."
                 
-                # Compresión balanceada: preset ultrafast para que no tarde horas, crf 24 para excelente balance peso/calidad
-                # Filtro hqdn3d opcional: suaviza el grano analógico invisible de los 80s para desplomar el peso del archivo
+                # 🧠 [MODIFICACIÓN DE COMPRESIÓN MÁXIMA v6.7]:
+                # 1. Pasamos a -preset slow para maximizar la tasa de compresión por macrobloques. Reducción bruta de peso.
+                # 2. Clavamos -crf 19 para forzar calidad de preservación de grano y nitidez de cine de culto.
+                # 3. Mantenemos el audio limpio en AAC estéreo síncrono.
                 ffmpeg -y -nostdin -i "temp_$NOMBRE_FINAL" \
-                  -c:v libx265 -preset ultrafast -crf 24 -vf "hqdn3d=1.5:1.5:6:6" \
+                  -c:v libx265 -preset slow -crf 19 \
                   -c:a aac -ac 2 -ar 44100 \
                   "$NOMBRE_FINAL"
                   
@@ -95,4 +97,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          
+      
