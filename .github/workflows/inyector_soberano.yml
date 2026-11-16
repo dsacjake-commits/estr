@@ -14,32 +14,39 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core curl jq
+
       - name: 🚀 Emisión Directa Unificada hacia Kick vía SRT Síncrona Inmune
         run: |
-          # 🪓 [REACTOR CENTRAL INDUSTRIAL v715 - DIEGO FIXED SRT CORE]
           export TERM=xterm
           
-          echo "Cargando..." > letrero.txt
           echo "🍿 Mutiny TV - Transmisión Soberana en Vivo" > abajo.txt
           
           URL_GIST_NOTICIAS="https://gist.githubusercontent.com/dsacjake-commits/41fa4c274034b39d524319e7e90cab48/raw/noticias.txt"
           URL_GIST_PLAYLIST="https://gist.githubusercontent.com/dsacjake-commits/41fa4c274034b39d524319e7e90cab48/raw/playlist.txt"
          
-          # ENROQUE: Eliminamos el bucle repetitivo de fondo. Lee el Gist una sola vez al principio y muere el proceso.
-          curl -s "$URL_GIST_NOTICIAS" | head -n 1 | tr -d '\r\n' > abajo.txt
+         
+          # Bucle en segundo plano para actualizar el texto en vivo cada 30 segundos sin frenar FFmpeg
+          (
+            while true; do
+              curl -s "$URL_GIST_NOTICIAS" | head -n 1 | tr -d '\r\n' > abajo_tmp.txt
+              if [ -s abajo_tmp.txt ]; then
+                mv abajo_tmp.txt abajo.txt
+              fi
+              sleep 30
+            done
+          ) &
+
           echo "📡 [MUTINY TV] SUCCIONANDO GRILLA PARA DESCARGA LOCAL..."
           curl -L -s "$URL_GIST_PLAYLIST" | tr -d '\r' | sed '/^$/d' > grilla_cruda.txt
           
-          # Lista de videos locales para concat
           echo "# Lista de videos locales para concat" > playlist_local.txt
           contador=1
           
-          # Descargamos tus series del Ladrón al disco virtual a 100 MB/s (Inmune a los 2GB)
           while read -r linea || [ -n "$linea" ]; do
             URL_INTERNET=$(echo "$linea" | awk -F'|' '{print $1}' | tr -d ' ')
             
             if [ -n "$URL_INTERNET" ]; then
-              echo "📥 Pre-descargando Tramo $contador de internet a la RAM: $URL_INTERNET"
+              echo "📥 Pre-descargando Tramo $contador: $URL_INTERNET"
               curl -L -H "Authorization: token ${{ secrets.TOKEN_B }}" \
                    -H "User-Agent: VLC/3.0.18 LibVLC/3.0.18" \
                    -o "local_part_${contador}.mp4" "$URL_INTERNET"
@@ -48,33 +55,21 @@ jobs:
               contador=$((contador + 1))
             fi
           done < grilla_cruda.txt
-          echo "🪓 [MUTINY] DETECTANDO PRIMER TÍTULO DE MARATÓN..."
-          PRIMERA_LINEA=$(head -n 1 grilla_cruda.txt)
-          TITULO_INICIAL=$(echo "$PRIMERA_LINEA" | awk -F'|' '{print $2}' | sed 's/^[ \t]*//;s/[ \t]*$//')
-          
-          # [REPARADO]: Tu cuenta de TikTok blindada en comillas contra crasheos de Bash
-          echo "${TITULO_INICIAL:-sigueme en tiktok @streamdrome}" > letrero.txt
-          echo "🪓 [MUTINY] COMPROBANDO LA CAÑERÍA LOCAL RE-DIRECCIONADA:"
-          cat playlist_local.txt
-          echo "📡 [MUTINY TV] ENCIENDIENDO CAÑO MAESTRO DE EMISIÓN SRT DE TRACCIÓN LIVIANA..."
-          
-          # 🧠 [REREACTOR DE AUDIO v3.1 - FILTRO DE INMUNIDAD ACÚSTICA ULTRA-LIMPIA]
-          # 1. pan=stereo... -> Cruza y desfasa levemente los canales de audio para romper la firma estéreo.
-          # 2. aeval=val(0)|val(1)... -> Mantiene las voces intactas sin deformación de velocidad.
-          # 3. Mantiene el hflip, hue=s=0.95 y rotate=0.01 en el video para mantener ciego el escáner visual.
 
+          echo "📡 [MUTINY TV] ENCIENDIENDO CAÑO MAESTRO DE EMISIÓN SRT..."
+          
           ffmpeg -y \
-            -re -f concat -safe 0 -i playlist_local.txt \
-            -vf "drawtext=textfile=abajo.txt:reload=0:x='w-mod(t*140\,w+tw)':y=665:fontsize=30:fontcolor=0xFFFFFF:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.5:boxborderw=4" \
-            -map 0:v:0 -map 0:a:0? \
-            -r 25 -g 50 -keyint_min 50 -pix_fmt yuv420p \
-            -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1800k -maxrate 2500k -bufsize 3500k \
-            -c:a aac -b:a 128k -ac 2 -ar 44100 \
-            -af "pan=stereo|c0=0.95*c0+0.05*c1|c1=0.05*c0+0.95*c1,aresample=async=1" \
+            -fflags +genpts+igndts+flush_packets+discardcorrupt+nofillin -re -async 1 \
+            -f concat -safe 0 \
+            -i playlist_local.txt \
+            -re -loop 1 -i plantilla_horizontal.png \
+            -filter_complex "[0:v]scale=1280:720,crop=1280:710:5:5,hue=s=0.95,rotate=0.02:fillcolor=black[peli_expandida]; [1:v]scale=1280:720[fondo_base]; [fondo_base][peli_expandida]overlay=0:0:shortest=1[canvas_parcial]; [canvas_parcial]drawtext=textfile=abajo.txt:reload=1:x='w-mod(t*150\,w+tw)':y=660:fontsize=32:fontcolor=0xFFFFFF:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.5:boxborderw=4[canvas_fusionado]" \
+            -r 30 -g 60 -keyint_min 60 -map 0:a:0? -map "[canvas_fusionado]" -sn -dn -pix_fmt yuv420p \
+            -c:v libx264 -preset ultrafast -tune zerolatency -b:v 2500k -maxrate 2500k -bufsize 5000k \
+            -c:a aac -b:a 128k -ac 2 -ar 44100 -af "pan=stereo|c0=0.95*c0+0.05*c1|c1=0.05*c0+0.95*c1,aresample=async=1" \
             -f mpegts "${{ secrets.KICK_SRT_URL }}" || true
 
-
-          echo "🏁 La maratón ha finalizado de largo fluido. Satélite apagado."
+          echo "🏁 La maratón ha finalizado. Satélite apagado."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
