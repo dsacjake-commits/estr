@@ -65,23 +65,28 @@ jobs:
           # Convertimos nucleo_kick.mov a qtrle de 8 fps para que gaste 0 CPU en vivo
           ffmpeg -y -i nucleo_kick.mov -vf "fps=8,scale=130:-1" -c:v qtrle nucleo_rapido.mov
 
+          # 1. Pre-escalamos logo y núcleo UNA SOLA VEZ antes de transmitir (ahorra 50% de CPU)
+          ffmpeg -y -i logo_transparente.png -vf "scale=140:-1" logo_listo.png
+          ffmpeg -y -i nucleo_kick.mov -vf "fps=6,scale=125:-1" -c:v qtrle nucleo_rapido.mov
+
+          # 2. Stream directo sin reescalados redundantes ni cálculos repetidos por frame
           ffmpeg -y \
             -fflags +genpts+discardcorrupt -re \
             -f concat -safe 0 -i playlist_local.txt \
-            -i logo_transparente.png \
+            -i logo_listo.png \
             -stream_loop -1 -i nucleo_rapido.mov \
             -filter_complex "\
-              [0:v]scale=1280:720,crop=1280:710:5:5,hue=s=0.95[vid]; \
-              [1:v]scale=140:-1[logo]; \
-              [vid][logo]overlay=W-w-25:25[vid_logo]; \
-              [vid_logo][2:v]overlay=25:25:shortest=1[vid_nucleo]; \
-              [vid_nucleo]drawtext=textfile=abajo.txt:reload=1:x='w-mod(t*150\,w+tw)':y=665:fontsize=30:fontcolor=0xFFFFFF:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.5:boxborderw=4[outv]" \
+              [0:v]crop=1270:710:5:5,scale=1280:720:flags=fast_bilinear,hue=s=0.95[vid]; \
+              [vid][1:v]overlay=W-w-25:25:eval=init[v1]; \
+              [v1][2:v]overlay=25:25:eval=init:shortest=1[v2]; \
+              [v2]drawtext=textfile=abajo.txt:reload=0:x='w-mod(t*140\,w+tw)':y=665:fontsize=30:fontcolor=0xFFFFFF:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.5:boxborderw=4[outv]" \
             -map "[outv]" -map 0:a:0? \
             -r 25 -g 50 -keyint_min 50 -pix_fmt yuv420p \
-            -c:v libx264 -preset ultrafast -tune zerolatency -b:v 2500k -maxrate 3500k -bufsize 5000k \
+            -c:v libx264 -preset superfast -tune zerolatency -threads 0 -b:v 2200k -maxrate 3000k -bufsize 4500k \
             -c:a aac -b:a 128k -ac 2 -ar 44100 \
             -af "pan=stereo|c0=0.95*c0+0.05*c1|c1=0.05*c0+0.95*c1,aresample=async=1" \
             -f mpegts "${{ secrets.KICK_SRT_URL }}" || true
+
 
           echo "🏁 La maratón ha finalizado de largo fluido. Satélite apagado."
         env:
